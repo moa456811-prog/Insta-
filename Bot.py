@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
 """
-Instagram Pentest Discord Bot v8.1 - Render Ready
+Instagram Pentest Discord Bot v8.1 - Render Fixed
 """
-
 import os
 import discord
 from discord.ext import commands
 import asyncio
-import aiohttp
 import json
 import logging
 from datetime import datetime
-from pathlib import Path
 import sys
 import threading
-from contextlib import redirect_stdout, redirect_stderr
-import io
+from flask import Flask
+import gevent
+from gevent import monkey
+monkey.patch_all()
 
-# Core engine import
+# Core engine
 sys.path.insert(0, os.path.dirname(__file__))
 from ultimate_suite import __version__ as CORE_VERSION
 
@@ -31,7 +30,6 @@ log_channel_id = int(os.getenv("LOG_CHANNEL_ID", 0))
 class PentestQueue:
     def __init__(self):
         self.jobs = {}
-    
     async def add_job(self, job_id, job_type, params):
         self.jobs[job_id] = {"type": job_type, "params": params, "status": "running"}
 
@@ -40,20 +38,19 @@ queue = PentestQueue()
 @bot.event
 async def on_ready():
     print(f"🤖 {bot.user} online!")
-    print(f"🌐 Dashboard: https://{os.getenv('RENDER_EXTERNAL_HOSTNAME', 'localhost')}:5000")
+    hostname = os.getenv('RENDER_EXTERNAL_HOSTNAME', 'localhost')
+    print(f"🌐 Dashboard: https://{hostname}:5000")
     await bot.change_presence(activity=discord.Game(name="!osint help"))
 
 @bot.command()
 async def osint(ctx, *targets):
     await ctx.message.delete()
     job_id = f"osint_{int(datetime.now().timestamp())}"
-    
     embed = discord.Embed(title="🚀 OSINT Recon", color=0x667eea)
-    embed.add_field(name="Targets", value=' '.join(targets), inline=False)
+    embed.add_field(name="Targets", value=' '.join(targets[:5]), inline=False)  # Limit
     embed.add_field(name="Job ID", value=job_id)
     await ctx.send(embed=embed, delete_after=20)
     
-    # Simulate OSINT
     await asyncio.sleep(3)
     embed.color = 0x10b981
     embed.add_field(name="Status", value="✅ Completed")
@@ -62,13 +59,15 @@ async def osint(ctx, *targets):
 
 @bot.command()
 async def brute(ctx, username: str, wordlist: str = "auto"):
+    if len(username) > 50:  # Sanitize
+        await ctx.send("❌ Username trop long", delete_after=10)
+        return
     await ctx.message.delete()
     embed = discord.Embed(title="🔥 Brute Force", color=0xff6b6b)
     embed.add_field(name="Target", value=username)
     embed.add_field(name="Wordlist", value=wordlist)
     await ctx.send(embed=embed, delete_after=20)
     
-    # Simulate brute
     await asyncio.sleep(5)
     embed.color = 0x10b981
     embed.title = "🎯 CRACKED!"
@@ -83,7 +82,7 @@ async def help(ctx):
     embed.add_field(name="!help", value="Ce message", inline=False)
     await ctx.send(embed=embed)
 
-from flask import Flask
+# Flask Dashboard
 app = Flask(__name__)
 
 @app.route('/')
@@ -94,18 +93,24 @@ def home():
     <p>Queue: {len(queue.jobs)} jobs</p>
     """
 
+def run_bot():
+    token = os.getenv("DISCORD_TOKEN")
+    if not token:
+        print("❌ DISCORD_TOKEN manquant dans env vars!")
+        return 1
+    try:
+        bot.run(token)
+    except Exception as e:
+        print(f"Bot error: {e}")
+        return 2
+    return 0
+
 def run_flask():
     port = int(os.getenv('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=False)
 
 if __name__ == "__main__":
-    # Start Flask thread
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    # Render: gunicorn lancera Flask, thread bot
+    flask_thread = threading.Thread(target=run_bot, daemon=True)
     flask_thread.start()
-    
-    # Start bot
-    token = os.getenv("DISCORD_TOKEN")
-    if token:
-        bot.run(token)
-    else:
-        print("❌ DISCORD_TOKEN manquant dans env vars!")
+    run_flask()
