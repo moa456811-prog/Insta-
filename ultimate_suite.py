@@ -1,77 +1,102 @@
 #!/usr/bin/env python3
 """
-Instagram Ultimate Suite v8.0 - Core Engine
+CLI Test Suite for InstagramCore
 """
 
-__version__ = "8.0.0"
-
-import requests
+import sys
 import json
-import random
-from typing import Dict, List, Optional
+from engine import InstagramCore, __version__
 
-UA_POOL = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
-]
-
+# Codes couleur ANSI simplifiés
 class C:
-    GRN, RED, CYN = "\033[92m", "\033[91m", "\033[96m"
-    RESET = "\033[0m"
+    GRN, RED, CYN, YLW = "\033[92m", "\033[91m", "\033[96m", "\033[93m"
+    BOLD, RESET = "\033[1m", "\033[0m"
 
-def cb(color: str, text: str) -> str:
-    return f"{color}{text}{C.RESET}"
+def cb(color: str, text: str, bold=False) -> str:
+    prefix = C.BOLD if bold else ""
+    return f"{prefix}{color}{text}{C.RESET}"
 
-def recon_instagram(username: str) -> Dict:
-    """OSINT Instagram rapide"""
-    session = requests.Session()
-    session.headers['User-Agent'] = random.choice(UA_POOL)
-    
-    try:
-        url = f"https://www.instagram.com/{username}/?__a=1"
-        resp = session.get(url, timeout=10)
-        
-        if resp.status_code == 200:
-            data = resp.json()
-            user = data.get('graphql', {}).get('user', {})
-            
-            return {
-                "success": True,
-                "username": username,
-                "private": user.get('is_private', False),
-                "followers": user.get('edge_followed_by', {}).get('count', 0),
-                "posts": user.get('edge_owner_to_timeline_media', {}).get('count', 0)
-            }
-    except:
-        pass
-    
-    return {"success": False, "username": username, "error": "Target not found"}
-
-def generate_report(results: List[Dict]) -> str:
-    """HTML report simple"""
-    html = f"""
-    <html><body>
-    <h1>Instagram Recon Report</h1>
-    <table border="1">
-    """
+def generate_html_report(results: list) -> str:
+    """Génère un rapport HTML épuré."""
+    rows = ""
     for r in results:
-        status = "🔒 Private" if r.get('private') else "🌐 Public"
-        html += f"<tr><td>@{r['username']}</td><td>{status}</td><td>{r.get('followers', 0)}</td></tr>"
-    html += "</table></body></html>"
+        status_cls = "table-success" if r['success'] else "table-danger"
+        priv_icon = "🔒" if r.get('private') else "🌐"
+        veri_icon = "✅" if r.get('verified') else ""
+        
+        row = f"""
+        <tr class="{status_cls}">
+            <td>{cb(C.BOLD, f"@{r['username']}")}</td>
+            <td>{priv_icon} {'Privé' if r.get('private') else 'Public'}</td>
+            <td>{veri_icon} {r.get('full_name', 'N/A')}</td>
+            <td>{r.get('followers', 0):,}</td>
+            <td>{r.get('posts', 0):,}</td>
+            <td>{r.get('error', 'OK')}</td>
+        </tr>
+        """
+        rows += row
+
+    html = f"""
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <title>Rapport Recon Instagram Suite v{__version__}</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>body {{ background: #121212; color: #e0e0e0; padding: 20px; }} .table {{ color: #e0e0e0; }} .table-success {{ background-color: #1b5e20 !important; color: white !important; }} .table-danger {{ background-color: #b71c1c !important; color: white !important; }}</style>
+    </head>
+    <body>
+        <div class="container">
+            <h1 class="mb-4">📊 Rapport OSINT Instagram <small class="text-muted">v{__version__}</small></h1>
+            <table class="table table-dark table-striped table-bordered">
+                <thead><tr><th>Cible</th><th>Status</th><th>Nom Complet</th><th>Followers</th><th>Posts</th><th>Détails</th></tr></thead>
+                <tbody>{rows}</tbody>
+            </table>
+        </div>
+    </body>
+    </html>
+    """
     return html
 
 if __name__ == "__main__":
-    import sys
-    targets = sys.argv[1:] if len(sys.argv) > 1 else ['testuser']
-    results = [recon_instagram(t) for t in targets]
+    # Parsing rapide des arguments
+    # Usage: python test_suite.py <username1> <username2> --proxy=http://user:pass@ip:port
+    args = sys.argv[1:]
+    targets = [a for a in args if not a.startswith('--')]
+    proxy_arg = [a for a in args if a.startswith('--proxy=')]
     
-    print(cb(C.CYN, f"Recon {len(results)} targets"))
-    for r in results:
-        if r['success']:
-            print(cb(C.GRN, f"✅ @{r['username']} | {r['followers']} followers"))
+    proxy = proxy_arg[0].split('=')[1] if proxy_arg else None
+    
+    if not targets:
+        targets = ['cristiano', 'leomessi'] # Cibles par défaut pour test
+
+    print(cb(C.CYN, f"--- [Instagram Ultimate Suite v{__version__}] ---", bold=True))
+    if proxy:
+        print(cb(C.YLW, f"ℹ️ Utilisation du proxy: {proxy}"))
+    print(f"🕵️ Lancement de la reconnaissance sur {len(targets)} cibles...\n")
+
+    core = InstagramCore(proxy=proxy)
+    results = []
+
+    for t in targets:
+        print(f"Scrutin de {cb(C.BOLD, '@'+t)}...", end="", flush=True)
+        res = core.recon_user(t)
+        results.append(res)
+        
+        if res['success']:
+            priv = "[🔒]" if res['private'] else "[🌐]"
+            print(f"\r✅ {cb(C.GRN, priv)} @{res['username']} | {res['full_name']} | {res['followers']:,} followers")
         else:
-            print(cb(C.RED, f"❌ @{r['username']}"))
-    
-    with open("report.html", "w") as f:
-        f.write(generate_report(results))
-    print(cb(C.GRN, "📊 report.html généré"))
+            reason = res.get('status', 'Error')
+            print(f"\r❌ @{res['username']} | Status: {cb(C.RED, reason)} | {res['error']}")
+
+    # Sauvegarde des rapports
+    with open("results.json", "w", encoding='utf-8') as f:
+        json.dump(results, f, indent=4, ensure_ascii=False)
+        
+    with open("report.html", "w", encoding='utf-8') as f:
+        f.write(generate_html_report(results))
+
+    print(f"\n" + cb(C.CYN, f"--- Fin du scan ---", bold=True))
+    print(cb(C.GRN, "📄 results.json généré"))
+    print(cb(C.GRN, "📊 report.html généré (ouvre-le dans ton navigateur)"))
