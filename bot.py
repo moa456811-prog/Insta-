@@ -3,22 +3,25 @@ from flask import Flask
 from ultimate_suite import InstagramCore 
 
 app = Flask(__name__)
+# Initialisation du moteur de scan
 core = InstagramCore()
 
 @app.route('/')
 def home():
-    v = os.getenv('VERSION', '8.1')
+    version = os.getenv('VERSION', '8.1')
     return f"""
-    <body style="background:#000;color:#0f0;font-family:monospace;padding:50px;">
-        <h1>🏴‍☠️ Instagram Pentest Dashboard v{v}</h1>
-        <p>Statut : <span style="color:white;">Opérationnel</span></p>
-        <hr>
-        <p>Utilisez <b>/scan/NOM_UTILISATEUR</b> pour tester.</p>
-    </body>
+    <!DOCTYPE html>
+    <html style="background:black;color:lime;font-family:monospace;padding:50px;">
+    <h1>🏴‍☠️ Instagram Pentest Dashboard v{version}</h1>
+    <p>✅ Statut : Opérationnel</p>
+    <p>Utilisez /scan/NOM_UTILISATEUR pour tester.</p>
+    <hr><small>Render Deploy OK</small>
+    </html>
     """
 
 @app.route('/scan/<username>')
 def api_scan(username):
+    # Appelle la logique de ultimate_suite.py
     results = core.recon_user(username)
     return results
 
