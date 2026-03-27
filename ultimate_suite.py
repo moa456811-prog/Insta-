@@ -1,106 +1,41 @@
-#!/usr/bin/env python3
-"""
-CLI Test Suite for InstagramCore
-"""
+import requests
+import random
+import time
+from typing import Dict, Optional
 
-import sys
-import json
-from engine import InstagramCore, __version__
+class InstagramCore:
+    def __init__(self, proxy: Optional[str] = None):
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+            'X-IG-App-ID': '936619743392459', 
+            'X-Requested-With': 'XMLHttpRequest',
+            'Referer': 'https://www.instagram.com/',
+        })
+        if proxy:
+            self.session.proxies = {'http': proxy, 'https': proxy}
 
-# Codes couleur ANSI simplifiés
-class C:
-    GRN, RED, CYN, YLW = "\033[92m", "\033[91m", "\033[96m", "\033[93m"
-    BOLD, RESET = "\033[1m", "\033[0m"
-
-def cb(color: str, text: str, bold=False) -> str:
-    prefix = C.BOLD if bold else ""
-    return f"{prefix}{color}{text}{C.RESET}"
-
-def generate_html_report(results: list) -> str:
-    """Génère un rapport HTML épuré."""
-    rows = ""
-    for r in results:
-        status_cls = "table-success" if r['success'] else "table-danger"
-        priv_icon = "🔒" if r.get('private') else "🌐"
-        veri_icon = "✅" if r.get('verified') else ""
+    def recon_user(self, username: str) -> Dict:
+        username = username.strip().replace('@', '')
+        url = f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}"
         
-        row = f"""
-        <tr class="{status_cls}">
-            <td>{cb(C.BOLD, f"@{r['username']}")}</td>
-            <td>{priv_icon} {'Privé' if r.get('private') else 'Public'}</td>
-            <td>{veri_icon} {r.get('full_name', 'N/A')}</td>
-            <td>{r.get('followers', 0):,}</td>
-            <td>{r.get('posts', 0):,}</td>
-            <td>{r.get('error', 'OK')}</td>
-        </tr>
-        """
-        rows += row
-
-    html = f"""
-    <!DOCTYPE html>
-    <html lang="fr">
-    <head>
-        <meta charset="UTF-8">
-        <title>Rapport Recon Instagram Suite v{__version__}</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-        <style>body {{ background: #121212; color: #e0e0e0; padding: 20px; }} .table {{ color: #e0e0e0; }} .table-success {{ background-color: #1b5e20 !important; color: white !important; }} .table-danger {{ background-color: #b71c1c !important; color: white !important; }}</style>
-    </head>
-    <body>
-        <div class="container">
-            <h1 class="mb-4">📊 Rapport OSINT Instagram <small class="text-muted">v{__version__}</small></h1>
-            <table class="table table-dark table-striped table-bordered">
-                <thead><tr><th>Cible</th><th>Status</th><th>Nom Complet</th><th>Followers</th><th>Posts</th><th>Détails</th></tr></thead>
-                <tbody>{rows}</tbody>
-            </table>
-        </div>
-    </body>
-    </html>
-    """
-    return html
-
-if __name__ == "__main__":
-    # Parsing rapide des arguments
-    # Usage: python test_suite.py <username1> <username2> --proxy=http://user:pass@ip:port
-    args = sys.argv[1:]
-    targets = [a for a in args if not a.startswith('--')]
-    proxy_arg = [a for a in args if a.startswith('--proxy=')]
-    
-    proxy = proxy_arg[0].split('=')[1] if proxy_arg else None
-    
-    if not targets:
-        targets = ['cristiano', 'leomessi'] # Cibles par défaut pour test
-
-    print(cb(C.CYN, f"--- [Instagram Ultimate Suite v{__version__}] ---", bold=True))
-    if proxy:
-        print(cb(C.YLW, f"ℹ️ Utilisation du proxy: {proxy}"))
-    print(f"🕵️ Lancement de la reconnaissance sur {len(targets)} cibles...\n")
-
-    core = InstagramCore(proxy=proxy)
-    results = []
-
-    for t in targets:
-        print(f"Scrutin de {cb(C.BOLD, '@'+t)}...", end="", flush=True)
-        res = core.recon_user(t)
-        results.append(res)
-        
-        if res['success']:
-            priv = "[🔒]" if res['private'] else "[🌐]"
-            print(f"\r✅ {cb(C.GRN, priv)} @{res['username']} | {res['full_name']} | {res['followers']:,} followers")
-        else:
-            reason = res.get('status', 'Error')
-            print(f"\r❌ @{res['username']} | Status: {cb(C.RED, reason)} | {res['error']}")
-
-    # Sauvegarde des rapports
-    with open("results.json", "w", encoding='utf-8') as f:
-        json.dump(results, f, indent=4, ensure_ascii=False)
-        
-    with open("report.html", "w", encoding='utf-8') as f:
-        f.write(generate_html_report(results))
-
-    print(f"\n" + cb(C.CYN, f"--- Fin du scan ---", bold=True))
-    print(cb(C.GRN, "📄 results.json généré"))
-<<<<<<< HEAD
-    print(cb(C.GRN, "📊 report.html généré (ouvre-le dans ton navigateur)"))
-=======
-    print(cb(C.GRN, "📊 report.html généré (ouvre-le dans ton navigateur)"))
->>>>>>> c6f6e02d1b82398f59f8eb87060de4cd83edae54
+        try:
+            time.sleep(random.uniform(1.0, 2.0)) 
+            resp = self.session.get(url, timeout=15)
+            
+            if resp.status_code == 200:
+                user = resp.json().get('data', {}).get('user', {})
+                if not user: return {"success": False, "error": "Utilisateur introuvable"}
+                
+                return {
+                    "success": True,
+                    "username": username,
+                    "full_name": user.get('full_name'),
+                    "followers": user.get('edge_followed_by', {}).get('count', 0),
+                    "private": user.get('is_private', False),
+                    "posts": user.get('edge_owner_to_timeline_media', {}).get('count', 0)
+                }
+            return {"success": False, "error": f"Erreur HTTP {resp.status_code}"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
