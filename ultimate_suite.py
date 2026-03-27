@@ -99,4 +99,8 @@ if __name__ == "__main__":
 
     print(f"\n" + cb(C.CYN, f"--- Fin du scan ---", bold=True))
     print(cb(C.GRN, "📄 results.json généré"))
+<<<<<<< HEAD
     print(cb(C.GRN, "📊 report.html généré (ouvre-le dans ton navigateur)"))
+=======
+    print(cb(C.GRN, "📊 report.html généré (ouvre-le dans ton navigateur)"))
+>>>>>>> c6f6e02d1b82398f59f8eb87060de4cd83edae54

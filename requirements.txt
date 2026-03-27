@@ -1,3 +1,7 @@
 flask==3.0.3
 gunicorn==22.0.0
+<<<<<<< HEAD
 requests
+=======
+requests
+>>>>>>> c6f6e02d1b82398f59f8eb87060de4cd83edae54

@@ -30,4 +30,8 @@ def api_scan(username):
 if __name__ == "__main__":
     # Important pour Render si tu n'utilises pas Gunicorn
     port = int(os.environ.get("PORT", 5000))
+<<<<<<< HEAD
     app.run(host='0.0.0.0', port=port)
+=======
+    app.run(host='0.0.0.0', port=port)
+>>>>>>> c6f6e02d1b82398f59f8eb87060de4cd83edae54
